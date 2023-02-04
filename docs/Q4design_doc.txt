@@ -1,0 +1,56 @@
+######################################################################
+#
+#       Please include the following:
+#     
+#         1) An explanation of what you wrote and how the ScriptPubKey works
+#         2) Briefly, how the ScriptPubKey you wrote fits into the bigger 
+#            picture of this atomic swap.
+#         3) Consider the case of Alice sending coins to Bob with coinExchangeScript:
+#            Why can Alice always get her money back if Bob doesn't redeem it? 
+#            Why can't this be solved with a simple 1-of-2 multisig? 
+#
+
+1) An explanation of what you wrote and how the ScriptPubKey works
+In the coinExchangeScript, as I need to ensure the transaction can either be redeemable by the recipient who has the
+secret x or be redeemable with signature from both the sender and the recipient, I choose to use an "IF ELSE"
+statement to implement this. To be more specific, I used "OP_IF", "OP_ELSE", and "OP_ENDIF".
+
+If the top of the stack is true, to ensure the transaction can be redeemable by the recipient who has the secret x,
+I first check the secret x the recipient has is indeed the hash_of_secret with "OP_EQUALVERIFY".
+If his/her secret is wrong, the transaction will stop. Then, I use public_key_recipient and "OP_CHECKSIG" to check that
+the signature provided by the recipient is valid. This is the first scenario, where the ScriptSig will be
+"sig_recipient, secret, OP_TRUE".
+
+If the top of stack is false, the transaction can be redeemed when both the sender and the recipient sign the transaction.
+So this is implemented by passing through the "OP_ELSE" branch, where the signature of the sender is first verified.
+Then, if it is valid, we will continue to check that the signature of the recipient is valid; if it is not valid, the
+transaction will be stopped. This transaction will only happen if both of the signature is valid.
+
+2) Briefly, how the ScriptPubKey you wrote fits into the bigger picture of this atomic swap.
+In atomic swap, the following events happen:
+a) Alice creates TX1 to pay her n bitcoin on BTC Testnet3 to Bob's public key with the coinExchangeScript I wrote.
+    it can be redeemed by Bob with the secret x or by both of their signature
+b) Alice creates TX2 to send n bitcoin from TX1 back to Alice's address, locked by 48 hours, signed by her, and sends to Bob
+c) Bob signs TX2 and Alice submits TX1
+d) Bob creates TX3 to pay his n bitcoin on BlockCypher testnet to Alice's public key with the coinExchangeScript with H(x)
+e) Bob creates TX4 to send n bitcoin from TX3 back to Bob's address, locked by 24 hours, signed by him, and sends to Alice
+f) Alice signs TX4 and Bob submits TX3
+g) Alice spends TX3 and reveals x
+h) Bob spends TX1 using x
+
+If nothing goes wrong, Alice will be able to redeem her bitcoin with x and her signature; then she reveals x,
+and Bobs could redeem his bitcoin as well because the secret x is revealed in the transaction. So if everything
+turns out well, Alice/Bob will use 'coinExchangeScriptSig1' I wrote to redeem the coins; Otherwise, they can take back
+their coins with 'coinExchangeScriptSig2' after the specified locktime has passed.
+
+3) Consider the case of Alice sending coins to Bob with coinExchangeScript:
+
+Why can Alice always get her money back if Bob doesn't redeem it?
+- She can always get her money back after 48 hours of lock time with TX2 and Bob has already signed TX2. In other words,
+she can always get her money back with both party's signature.
+
+Why can't this be solved with a simple 1-of-2 multisig?
+- One of the transaction will be published prior to the other, if 1-out-2 multisig is used, one party can always steal
+the other party's money without having to send out theirs. Or even if they send out their money, their can always try to
+get the money back with their own signature if a simple 1-of-2 multisig is used.
+
